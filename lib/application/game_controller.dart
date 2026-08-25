@@ -64,6 +64,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       currentRound: RoundData(
           number: nextNumber, letter: null, stopperPlayerId: stopper.id),
     );
+    // Los clientes necesitan el RoundData antes de recibir la letra.
+    _publishState();
     _broadcast(GameEvent.startLetterSpin, {'stopperPlayerId': stopper.id});
   }
 
@@ -79,7 +81,17 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void triggerBasta() {
-    _assertHost();
+    if (!_isHost) {
+      _socket.sendToHost(
+        GameMessage(
+            event: GameEvent.triggerBasta, payload: {'playerId': _me.id}),
+      );
+      return;
+    }
+    _startBastaAsHost();
+  }
+
+  void _startBastaAsHost() {
     if (state!.phase != GamePhase.answering) return;
     _beginBastaCountdown();
     _broadcast(GameEvent.triggerBasta, {'seconds': state!.config.bastaSeconds});
@@ -120,6 +132,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
           message.payload['playerId'] as String,
           Map<String, String>.from(message.payload['answers'] as Map),
         );
+      case GameEvent.triggerBasta:
+        _startBastaAsHost();
       case GameEvent.invalidateCurrentCategory:
         _invalidate(
           message.payload['playerId'] as String,
