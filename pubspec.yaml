@@ -1,0 +1,22 @@
+name: basta_local
+description: Juego Basta multijugador local P2P sobre Wi-Fi.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.3.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bonsoir: ^5.1.10
+  web_socket_channel: ^3.0.1
+  uuid: ^4.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

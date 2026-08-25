@@ -1,0 +1,34 @@
+# Dart / Flutter generated files
+.dart_tool/
+.packages
+.pub/
+build/
+
+# Platform build output
+android/.gradle/
+android/app/build/
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/.symlinks/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+
+# IDE and editor settings
+.idea/
+*.iml
+.vscode/
+
+# OS files and logs
+.DS_Store
+*.log
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.keystore
+key.properties
+android/key.properties
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
