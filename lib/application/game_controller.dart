@@ -28,6 +28,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   bool get inputsEnabled =>
       state?.phase == GamePhase.answering ||
       state?.phase == GamePhase.bastaCountdown;
+  String get playerId => _me.id;
 
   Future<void> host(GameConfig config) async {
     _isHost = true;
@@ -112,6 +113,19 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  /// La validación y resolución final de la impugnación pertenece al Host.
+  void challengeWord({required String playerId, required String word}) {
+    final message = GameMessage(
+      event: GameEvent.challengeWord,
+      payload: {'playerId': playerId, 'word': word},
+    );
+    if (_isHost) {
+      _handleHostMessage(message);
+    } else {
+      _socket.sendToHost(message);
+    }
+  }
+
   void _listen() => _messages ??= _socket.messages.listen(_handleMessage);
 
   void _handleMessage(GameMessage message) {
@@ -139,6 +153,9 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
           message.payload['playerId'] as String,
           message.payload['category'] as String,
         );
+      case GameEvent.challengeWord:
+      // Punto de extensión: el Host registra/resuelve la impugnación.
+      // El transporte ya recibió CHALLENGE_WORD con playerId y word.
       default:
         break;
     }
@@ -204,6 +221,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         answersByPlayer: {...old.answersByPlayer, playerId: answers},
       ),
     );
+    _publishState();
   }
 
   void _invalidate(String playerId, String category) {

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../application/game_controller.dart';
 import '../domain/models/game_state.dart';
+import 'showcase_screen.dart';
 
 /// Pantalla de respuesta de cada cliente durante una ronda local.
 /// Los borradores permanecen locales hasta FREEZE_INPUTS, cuando se entregan al Host.
@@ -63,7 +64,11 @@ class _GameScreenState extends State<GameScreen> {
         if (state == null) return const Scaffold(body: SizedBox.shrink());
         if (state.phase == GamePhase.frozen ||
             state.phase == GamePhase.finished) {
-          return _RoundReview(state: state, answers: _answers);
+          return ShowcaseScreen(
+            controller: widget.controller,
+            state: state,
+            localAnswers: _answers,
+          );
         }
         return Scaffold(
           appBar: AppBar(
@@ -255,33 +260,6 @@ class _BastaCountdownBanner extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onInverseSurface),
             ),
           ),
-        ),
-      );
-}
-
-class _RoundReview extends StatelessWidget {
-  const _RoundReview({required this.state, required this.answers});
-  final GameState state;
-  final Map<String, String> answers;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Revisión de ronda')),
-        body: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('Letra ${state.currentRound?.letter ?? ''}',
-                style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: 18),
-            ...state.config.categories.map(
-              (category) => ListTile(
-                title: Text(category),
-                subtitle: Text(answers[category]?.trim().isNotEmpty == true
-                    ? answers[category]!
-                    : 'Sin respuesta'),
-              ),
-            ),
-          ],
         ),
       );
 }

@@ -9,6 +9,7 @@ enum GameEvent {
   freezeInputs,
   submitAnswers,
   invalidateCurrentCategory,
+  challengeWord,
   error,
 }
 
@@ -22,6 +23,7 @@ extension GameEventWireFormat on GameEvent {
         GameEvent.freezeInputs => 'FREEZE_INPUTS',
         GameEvent.submitAnswers => 'SUBMIT_ANSWERS',
         GameEvent.invalidateCurrentCategory => 'INVALIDATE_CURRENT_CATEGORY',
+        GameEvent.challengeWord => 'CHALLENGE_WORD',
         GameEvent.error => 'ERROR',
       };
 
