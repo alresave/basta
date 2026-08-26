@@ -1,6 +1,6 @@
 # Bitácora y pendientes — Basta P2P
 
-Fecha: 2026-08-25
+Fecha: 2026-08-26
 
 ## Hecho hoy
 
@@ -35,13 +35,37 @@ Fecha: 2026-08-25
 - [x] Añadidas pruebas unitarias del comparador de palabras y puntuación.
 - [x] Commit: `9ae1919 feat: add animated round review showcase`.
 
-> Anotación de continuidad: hasta este punto está completada la **tercera parte** del desarrollo solicitado. La siguiente iteración debe partir de `ShowcaseScreen` y del evento `CHALLENGE_WORD` para implementar la resolución autoritativa de impugnaciones y el cálculo final de puntajes.
+### Parte 4 — Tribunal de Palabras
+
+- [x] Implementado `WordValidationService` offline-first con diccionario JSON embebido y consulta remota de respaldo.
+- [x] Añadido `ChallengeModal` sincronizado: veredicto con definición o votación de jurado de 5 segundos.
+- [x] Añadidos eventos WebSocket de comprobación, voto, inicio de jurado y resolución.
+- [x] Registrada la validez de casillas confirmadas por el Tribunal (100 pts).
+- [x] Commit: `effd43d feat: add word challenge tribunal`.
+
+### Parte 5 — Puntuación y final de partida
+
+- [x] Implementado `ScoreCalculatorService`: 100 pts única, 50 pts repetida, 0 pts inválida/vacía/cancelada y +20 por defensa exitosa.
+- [x] Creado `GameRegistry` con historial de rondas, acumulados y letras ya jugadas; persistencia local con `shared_preferences`.
+- [x] Implementada rotación del jugador que detiene el abecedario y prevención de letras repetidas.
+- [x] Creada `LeaderboardScreen` con posiciones y premios Enciclopedia, Abogado y Poeta.
+- [x] Commit: `f22700c feat: add scoring and final leaderboard`.
+
+### Parte 6 — UX, Android y distribución
+
+- [x] Añadido `FeedbackService` para sonidos del sistema y hápticos de giro, inicio, cuenta regresiva, Basta, juicio y victoria.
+- [x] Añadido banner global de desconexión y reconexión rápida al Host sin perder el registro de puntos.
+- [x] Generada la plataforma Android, permisos de red local y APK release verificable.
+- [x] Actualizado `bonsoir` a 7.1.5 y migrado el descubrimiento mDNS a su API actual.
+- [x] Generados recursos visuales para launcher/adaptive icon Android.
+- [x] Añadida landing de descarga y workflow de GitHub Pages que compila y publica el APK.
+- [x] Commit: `2dbfef8 feat: add Android release and download page`.
 
 ## Pendiente
 
-- [ ] Implementar resolución y persistencia en `GameState` de las impugnaciones recibidas por el Host.
-- [ ] Implementar cálculo final de puntos y tabla de resultados por ronda/partida.
 - [ ] Añadir flujo visual de lobby: buscar salas, unirse, configurar categorías y comenzar partida.
-- [ ] Añadir reconexión, manejo de desconexiones y validación de mensajes de red.
-- [ ] Configurar permisos de red local/Bonjour de Android e iOS en los proyectos de plataforma generados.
+- [ ] Completar reconexión del Host y validación/autorización de mensajes de red (la alerta y reconexión de clientes ya están implementadas).
+- [ ] Configurar permisos de red local/Bonjour para iOS y realizar pruebas físicas de descubrimiento Android/iOS.
 - [ ] Añadir pruebas de integración para el flujo Host–Cliente y transición de rondas.
+- [ ] Configurar keystore de release, `applicationId` definitivo e íconos nativos antes de distribuir por Play Store.
+- [ ] Habilitar GitHub Pages con fuente **GitHub Actions** y confirmar la primera publicación del workflow.
