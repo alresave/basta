@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../application/game_controller.dart';
 import '../domain/models/game_state.dart';
 import 'showcase_screen.dart';
+import 'leaderboard_screen.dart';
 
 /// Pantalla de respuesta de cada cliente durante una ronda local.
 /// Los borradores permanecen locales hasta FREEZE_INPUTS, cuando se entregan al Host.
@@ -62,8 +63,10 @@ class _GameScreenState extends State<GameScreen> {
       builder: (context, _) {
         final state = widget.controller.state;
         if (state == null) return const Scaffold(body: SizedBox.shrink());
-        if (state.phase == GamePhase.frozen ||
-            state.phase == GamePhase.finished) {
+        if (state.phase == GamePhase.finished) {
+          return LeaderboardScreen(state: state);
+        }
+        if (state.phase == GamePhase.frozen) {
           return ShowcaseScreen(
             controller: widget.controller,
             state: state,
@@ -75,13 +78,7 @@ class _GameScreenState extends State<GameScreen> {
             title: Text('Ronda ${state.currentRound?.number ?? '-'}'),
             centerTitle: true,
           ),
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _isComplete(state) && widget.controller.inputsEnabled
-                ? widget.controller.triggerBasta
-                : null,
-            icon: const Icon(Icons.timer_outlined),
-            label: const Text('¡BASTA!'),
-          ),
+          floatingActionButton: _roundAction(state),
           body: Stack(
             children: [
               SafeArea(
@@ -98,6 +95,31 @@ class _GameScreenState extends State<GameScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _roundAction(GameState state) {
+    if (state.phase == GamePhase.lobby && widget.controller.isHost) {
+      return FloatingActionButton.extended(
+        onPressed: widget.controller.startRound,
+        icon: const Icon(Icons.play_arrow_rounded),
+        label: const Text('Iniciar ronda'),
+      );
+    }
+    if (state.phase == GamePhase.spinning &&
+        state.currentRound?.stopperPlayerId == widget.controller.playerId) {
+      return FloatingActionButton.extended(
+        onPressed: widget.controller.stopLetter,
+        icon: const Icon(Icons.stop_circle_outlined),
+        label: const Text('Detener abecedario'),
+      );
+    }
+    return FloatingActionButton.extended(
+      onPressed: _isComplete(state) && widget.controller.inputsEnabled
+          ? widget.controller.triggerBasta
+          : null,
+      icon: const Icon(Icons.timer_outlined),
+      label: const Text('¡BASTA!'),
     );
   }
 

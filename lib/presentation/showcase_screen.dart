@@ -193,8 +193,16 @@ class _ShowcaseScreenState extends State<ShowcaseScreen>
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
-            child: Text(
-                '${_categoryIndex + 1} / ${categories.length} · Desliza para continuar'),
+            child: widget.controller.isHost
+                ? FilledButton.icon(
+                    onPressed: widget.controller.activeChallenge == null
+                        ? widget.controller.finishReview
+                        : null,
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text('Cerrar ronda'),
+                  )
+                : Text(
+                    '${_categoryIndex + 1} / ${categories.length} · Esperando al Host'),
           ),
         ]),
         if (widget.controller.activeChallenge case final challenge?)

@@ -1,5 +1,6 @@
 import 'player.dart';
 import 'round_data.dart';
+import 'game_registry.dart';
 
 enum GamePhase { lobby, spinning, answering, bastaCountdown, frozen, finished }
 
@@ -36,6 +37,7 @@ class GameState {
     this.phase = GamePhase.lobby,
     this.currentRound,
     this.secondsRemaining = 0,
+    this.registry = const GameRegistry(),
   });
 
   final String roomId;
@@ -45,12 +47,14 @@ class GameState {
   final GamePhase phase;
   final RoundData? currentRound;
   final int secondsRemaining;
+  final GameRegistry registry;
 
   GameState copyWith({
     List<Player>? players,
     GamePhase? phase,
     RoundData? currentRound,
     int? secondsRemaining,
+    GameRegistry? registry,
   }) =>
       GameState(
         roomId: roomId,
@@ -60,6 +64,7 @@ class GameState {
         phase: phase ?? this.phase,
         currentRound: currentRound ?? this.currentRound,
         secondsRemaining: secondsRemaining ?? this.secondsRemaining,
+        registry: registry ?? this.registry,
       );
 
   Map<String, dynamic> toJson() => {
@@ -70,6 +75,7 @@ class GameState {
         'phase': phase.name,
         'currentRound': currentRound?.toJson(),
         'secondsRemaining': secondsRemaining,
+        'registry': registry.toJson(),
       };
 
   factory GameState.fromJson(Map<String, dynamic> json) => GameState(
@@ -84,5 +90,9 @@ class GameState {
             ? null
             : RoundData.fromJson(json['currentRound'] as Map<String, dynamic>),
         secondsRemaining: json['secondsRemaining'] as int? ?? 0,
+        registry: json['registry'] == null
+            ? const GameRegistry()
+            : GameRegistry.fromJson(
+                Map<String, dynamic>.from(json['registry'] as Map)),
       );
 }

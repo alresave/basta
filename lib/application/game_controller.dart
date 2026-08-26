@@ -7,11 +7,13 @@ import 'package:uuid/uuid.dart';
 import '../data/network/local_discovery_service.dart';
 import '../data/network/socket_service.dart';
 import '../data/protocol/game_message.dart';
+import '../data/storage/game_registry_storage.dart';
 import '../data/validation/word_validation_service.dart';
 import '../domain/models/game_state.dart';
 import '../domain/models/player.dart';
 import '../domain/models/round_data.dart';
 import '../domain/models/word_challenge.dart';
+import 'score_calculator_service.dart';
 
 class GameController extends ChangeNotifier with WidgetsBindingObserver {
   GameController(
@@ -25,6 +27,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   final _discovery = LocalDiscoveryService();
   final _alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
   final WordValidationService _wordValidationService;
+  final _scoreCalculator = const ScoreCalculatorService();
+  final _registryStorage = GameRegistryStorage();
   StreamSubscription<GameMessage>? _messages;
   Timer? _countdown;
   Timer? _juryTimer;
@@ -33,11 +37,14 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   GameState? state;
   WordChallenge? activeChallenge;
   final Map<String, bool> _juryVotes = {};
+  final List<WordChallenge> _roundChallenges = [];
+  bool _finishingReview = false;
 
   bool get inputsEnabled =>
       state?.phase == GamePhase.answering ||
       state?.phase == GamePhase.bastaCountdown;
   String get playerId => _me.id;
+  bool get isHost => _isHost;
 
   Future<void> host(GameConfig config) async {
     _isHost = true;
@@ -67,8 +74,14 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   void startRound() {
     _assertHost();
+    if (state!.registry.rounds.length >= state!.config.totalRounds ||
+        state!.registry.playedLetters.length >= _alphabet.length) {
+      _finishGame();
+      return;
+    }
     final nextNumber = (state!.currentRound?.number ?? 0) + 1;
-    final stopper = state!.players[nextNumber % state!.players.length];
+    final stopper = state!.players[(nextNumber - 1) % state!.players.length];
+    _roundChallenges.clear();
     state = state!.copyWith(
       phase: GamePhase.spinning,
       currentRound: RoundData(
@@ -80,12 +93,32 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void stopLetter() {
-    _assertHost();
+    if (!_isHost) {
+      _socket.sendToHost(GameMessage(
+        event: GameEvent.stopLetter,
+        payload: {'playerId': _me.id},
+      ));
+      return;
+    }
+    _stopLetterAsHost();
+  }
+
+  void _stopLetterAsHost() {
     if (state!.phase != GamePhase.spinning) return;
-    final letter = _alphabet[Random.secure().nextInt(_alphabet.length)];
+    final available = _alphabet
+        .where((letter) => !state!.registry.playedLetters.contains(letter))
+        .toList();
+    if (available.isEmpty) {
+      _finishGame();
+      return;
+    }
+    final letter = available[Random.secure().nextInt(available.length)];
     state = state!.copyWith(
       phase: GamePhase.answering,
       currentRound: state!.currentRound!.copyWith(letter: letter),
+      registry: state!.registry.copyWith(
+        playedLetters: [...state!.registry.playedLetters, letter],
+      ),
     );
     _broadcast(GameEvent.letterStopped, {'letter': letter});
   }
@@ -161,6 +194,11 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         );
       case GameEvent.triggerBasta:
         _startBastaAsHost();
+      case GameEvent.stopLetter:
+        if (message.payload['playerId'] ==
+            state!.currentRound?.stopperPlayerId) {
+          _stopLetterAsHost();
+        }
       case GameEvent.invalidateCurrentCategory:
         _invalidate(
           message.payload['playerId'] as String,
@@ -220,6 +258,10 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }) async {
     if (activeChallenge != null &&
         activeChallenge!.status != ChallengeStatus.resolved) {
+      return;
+    }
+    if (_roundChallenges.any(
+        (item) => item.playerId == playerId && item.category == category)) {
       return;
     }
     final challenge = WordChallenge(
@@ -297,11 +339,14 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     _resolveChallenge(challenge.copyWith(
       status: ChallengeStatus.resolved,
       valid: validVotes > invalidVotes,
+      resolvedByJury: true,
     ));
   }
 
   void _resolveChallenge(WordChallenge challenge) {
     activeChallenge = challenge;
+    _roundChallenges.removeWhere((item) => item.id == challenge.id);
+    _roundChallenges.add(challenge);
     if (challenge.valid == false) {
       _invalidate(challenge.playerId, challenge.category);
     } else {
@@ -309,6 +354,41 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     }
     _publishState();
     _broadcast(GameEvent.challengeResolved, {'challenge': challenge.toJson()});
+  }
+
+  Future<void> finishReview() async {
+    _assertHost();
+    final round = state!.currentRound;
+    if (_finishingReview || round == null || state!.phase != GamePhase.frozen) {
+      return;
+    }
+    _finishingReview = true;
+    final roundScore = _scoreCalculator.calculate(
+      round: round,
+      state: state!,
+      resolvedChallenges: _roundChallenges,
+    );
+    state = state!.copyWith(
+      registry: state!.registry.copyWith(
+        rounds: [...state!.registry.rounds, roundScore],
+      ),
+    );
+    try {
+      await _registryStorage.save(state!.roomId, state!.registry);
+      if (state!.registry.rounds.length >= state!.config.totalRounds ||
+          state!.registry.playedLetters.length >= _alphabet.length) {
+        _finishGame();
+      } else {
+        startRound();
+      }
+    } finally {
+      _finishingReview = false;
+    }
+  }
+
+  void _finishGame() {
+    state = state!.copyWith(phase: GamePhase.finished, secondsRemaining: 0);
+    _publishState();
   }
 
   void _validate(String playerId, String category) {

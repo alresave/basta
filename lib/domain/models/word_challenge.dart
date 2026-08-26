@@ -10,6 +10,7 @@ class WordChallenge {
     this.definition,
     this.valid,
     this.deadlineEpochMs,
+    this.resolvedByJury = false,
   });
 
   final String id;
@@ -20,12 +21,14 @@ class WordChallenge {
   final String? definition;
   final bool? valid;
   final int? deadlineEpochMs;
+  final bool resolvedByJury;
 
   WordChallenge copyWith({
     ChallengeStatus? status,
     String? definition,
     bool? valid,
     int? deadlineEpochMs,
+    bool? resolvedByJury,
   }) =>
       WordChallenge(
         id: id,
@@ -36,6 +39,7 @@ class WordChallenge {
         definition: definition ?? this.definition,
         valid: valid ?? this.valid,
         deadlineEpochMs: deadlineEpochMs ?? this.deadlineEpochMs,
+        resolvedByJury: resolvedByJury ?? this.resolvedByJury,
       );
 
   Map<String, dynamic> toJson() => {
@@ -47,6 +51,7 @@ class WordChallenge {
         'definition': definition,
         'valid': valid,
         'deadlineEpochMs': deadlineEpochMs,
+        'resolvedByJury': resolvedByJury,
       };
 
   factory WordChallenge.fromJson(Map<String, dynamic> json) => WordChallenge(
@@ -58,5 +63,6 @@ class WordChallenge {
         definition: json['definition'] as String?,
         valid: json['valid'] as bool?,
         deadlineEpochMs: json['deadlineEpochMs'] as int?,
+        resolvedByJury: json['resolvedByJury'] as bool? ?? false,
       );
 }
