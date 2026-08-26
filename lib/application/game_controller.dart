@@ -5,8 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/network/local_discovery_service.dart';
-import '../data/network/socket_service.dart';
 import '../data/protocol/game_message.dart';
+import '../data/network/socket_service.dart';
 import '../data/storage/game_registry_storage.dart';
 import '../data/validation/word_validation_service.dart';
 import '../domain/models/game_state.dart';
@@ -14,6 +14,7 @@ import '../domain/models/player.dart';
 import '../domain/models/round_data.dart';
 import '../domain/models/word_challenge.dart';
 import 'score_calculator_service.dart';
+import 'feedback_service.dart';
 
 class GameController extends ChangeNotifier with WidgetsBindingObserver {
   GameController(
@@ -27,9 +28,11 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   final _discovery = LocalDiscoveryService();
   final _alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
   final WordValidationService _wordValidationService;
+  final _feedback = const FeedbackService();
   final _scoreCalculator = const ScoreCalculatorService();
   final _registryStorage = GameRegistryStorage();
   StreamSubscription<GameMessage>? _messages;
+  StreamSubscription<SocketConnectionState>? _connection;
   Timer? _countdown;
   Timer? _juryTimer;
   String? _activeCategory;
@@ -39,6 +42,9 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   final Map<String, bool> _juryVotes = {};
   final List<WordChallenge> _roundChallenges = [];
   bool _finishingReview = false;
+  String? _hostAddress;
+  int? _hostPort;
+  String? networkAlert;
 
   bool get inputsEnabled =>
       state?.phase == GamePhase.answering ||
@@ -56,6 +62,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       config: config,
     );
     _listen();
+    _listenConnection();
     await _discovery.advertise(roomId: state!.roomId, port: _socket.port);
     _publishState();
     notifyListeners();
@@ -66,7 +73,10 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> join(LocalRoom room) async {
     await _socket.connect(room.host, room.port);
+    _hostAddress = room.host;
+    _hostPort = room.port;
     _listen();
+    _listenConnection();
     _socket.sendToHost(
       GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()),
     );
@@ -82,6 +92,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     final nextNumber = (state!.currentRound?.number ?? 0) + 1;
     final stopper = state!.players[(nextNumber - 1) % state!.players.length];
     _roundChallenges.clear();
+    _feedback.roundBell();
+    _feedback.wheelStarted();
     state = state!.copyWith(
       phase: GamePhase.spinning,
       currentRound: RoundData(
@@ -113,6 +125,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     final letter = available[Random.secure().nextInt(available.length)];
+    _feedback.wheelStopped();
     state = state!.copyWith(
       phase: GamePhase.answering,
       currentRound: state!.currentRound!.copyWith(letter: letter),
@@ -124,6 +137,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void triggerBasta() {
+    _feedback.bastaPressed();
     if (!_isHost) {
       _socket.sendToHost(
         GameMessage(
@@ -173,6 +187,33 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _listen() => _messages ??= _socket.messages.listen(_handleMessage);
+
+  void _listenConnection() =>
+      _connection ??= _socket.connection.listen((connection) {
+        switch (connection) {
+          case SocketConnectionState.connected:
+            networkAlert = null;
+          case SocketConnectionState.reconnecting:
+            networkAlert = 'Reconectando a la sala…';
+          case SocketConnectionState.disconnected:
+            networkAlert = _isHost
+                ? 'Se perdió la conexión Wi‑Fi con los jugadores.'
+                : 'Se perdió la conexión con el Host.';
+        }
+        notifyListeners();
+      });
+
+  Future<void> reconnect() async {
+    if (_isHost || _hostAddress == null || _hostPort == null) return;
+    try {
+      await _socket.reconnect(_hostAddress!, _hostPort!);
+      _socket.sendToHost(
+          GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()));
+    } catch (_) {
+      networkAlert = 'No fue posible reconectar. Revisa la misma red Wi‑Fi.';
+      notifyListeners();
+    }
+  }
 
   void _handleMessage(GameMessage message) {
     if (_isHost) _handleHostMessage(message);
@@ -229,6 +270,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         );
       case GameEvent.startLetterSpin:
         state = state?.copyWith(phase: GamePhase.spinning);
+        _feedback.roundBell();
+        _feedback.wheelStarted();
       case GameEvent.letterStopped:
         state = state?.copyWith(
           phase: GamePhase.answering,
@@ -236,15 +279,21 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
             letter: message.payload['letter'] as String,
           ),
         );
+        _feedback.wheelStopped();
       case GameEvent.triggerBasta:
         _beginBastaCountdown(seconds: message.payload['seconds'] as int);
       case GameEvent.freezeInputs:
         _freeze();
       case GameEvent.challengeChecking:
+        _feedback.judgeGavel();
       case GameEvent.juryVoteStarted:
       case GameEvent.challengeResolved:
         activeChallenge = WordChallenge.fromJson(
             message.payload['challenge'] as Map<String, dynamic>);
+        if (message.event == GameEvent.challengeResolved) {
+          _feedback.verdict(valid: activeChallenge!.valid == true);
+          if (activeChallenge!.valid == true) _feedback.victoryFanfare();
+        }
       default:
         break;
     }
@@ -272,6 +321,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       status: ChallengeStatus.checking,
     );
     activeChallenge = challenge;
+    _feedback.judgeGavel();
     _broadcast(GameEvent.challengeChecking, {'challenge': challenge.toJson()});
 
     final result = await _wordValidationService.validate(word);
@@ -345,6 +395,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _resolveChallenge(WordChallenge challenge) {
     activeChallenge = challenge;
+    _feedback.verdict(valid: challenge.valid == true);
+    if (challenge.valid == true) _feedback.victoryFanfare();
     _roundChallenges.removeWhere((item) => item.id == challenge.id);
     _roundChallenges.add(challenge);
     if (challenge.valid == false) {
@@ -388,6 +440,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   void _finishGame() {
     state = state!.copyWith(phase: GamePhase.finished, secondsRemaining: 0);
+    _feedback.victoryFanfare();
     _publishState();
   }
 
@@ -407,11 +460,13 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       secondsRemaining: remaining,
     );
     notifyListeners();
+    _feedback.countdownTick();
     _countdown?.cancel();
     _juryTimer?.cancel();
     _countdown = Timer.periodic(const Duration(seconds: 1), (timer) {
       remaining--;
       state = state!.copyWith(secondsRemaining: remaining);
+      if (remaining > 0) _feedback.countdownTick();
       notifyListeners();
       if (remaining <= 0) {
         timer.cancel();
@@ -484,6 +539,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _countdown?.cancel();
     _messages?.cancel();
+    _connection?.cancel();
     _socket.dispose();
     _discovery.dispose();
     super.dispose();

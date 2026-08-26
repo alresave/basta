@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../application/game_controller.dart';
 import '../domain/models/game_state.dart';
 import 'game_screen.dart';
+import 'network_connection_banner.dart';
 
 class GamePage extends StatefulWidget {
   const GamePage({super.key});
@@ -32,7 +33,12 @@ class _GamePageState extends State<GamePage> {
         animation: controller,
         builder: (_, __) {
           final state = controller.state;
-          if (state != null) return GameScreen(controller: controller);
+          if (state != null) {
+            return Stack(children: [
+              GameScreen(controller: controller),
+              NetworkConnectionBanner(controller: controller),
+            ]);
+          }
           return Scaffold(
             appBar: AppBar(title: const Text('Basta Local')),
             body: Padding(

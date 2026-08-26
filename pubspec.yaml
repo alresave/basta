@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  bonsoir: ^5.1.10
+  bonsoir: ^7.1.5
   web_socket_channel: ^3.0.1
   uuid: ^4.4.2
   shared_preferences: ^2.3.2

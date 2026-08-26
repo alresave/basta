@@ -25,23 +25,21 @@ class LocalDiscoveryService {
         attributes: {'roomId': roomId, 'protocol': '1'},
       ),
     );
-    await _broadcast!.ready;
+    await _broadcast!.initialize();
     await _broadcast!.start();
   }
 
   Future<void> discover(void Function(LocalRoom room) onRoom) async {
     _discovery = BonsoirDiscovery(type: _serviceType);
-    await _discovery!.ready;
+    await _discovery!.initialize();
     _subscription = _discovery!.eventStream!.listen((event) async {
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceFound &&
-          event.service != null) {
-        await event.service!.resolve(_discovery!.serviceResolver);
+      if (event case BonsoirDiscoveryServiceFoundEvent()) {
+        await event.service.resolve(_discovery!.serviceResolver);
       }
-      if (event.type == BonsoirDiscoveryEventType.discoveryServiceResolved &&
-          event.service is ResolvedBonsoirService) {
-        final service = event.service! as ResolvedBonsoirService;
+      if (event case BonsoirDiscoveryServiceResolvedEvent()) {
+        final service = event.service;
         final roomId = service.attributes['roomId'];
-        final host = service.host;
+        final host = service.hostAddresses.firstOrNull;
         if (roomId != null && host != null) {
           onRoom(LocalRoom(id: roomId, host: host, port: service.port));
         }
