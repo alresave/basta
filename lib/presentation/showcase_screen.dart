@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../application/game_controller.dart';
 import '../domain/models/game_state.dart';
+import 'challenge_modal.dart';
 
 class WordMatch {
   const WordMatch({
@@ -157,41 +158,47 @@ class _ShowcaseScreenState extends State<ShowcaseScreen>
     final categories = widget.state.config.categories;
     return Scaffold(
       appBar: AppBar(title: const Text('Revisión de ronda')),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-          child: Text(
-            'Categoría: ${categories[_categoryIndex].toUpperCase()} · Letra: ${widget.state.currentRound?.letter ?? '—'}',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
+      body: Stack(children: [
+        Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Text(
+              'Categoría: ${categories[_categoryIndex].toUpperCase()} · Letra: ${widget.state.currentRound?.letter ?? '—'}',
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
           ),
-        ),
-        const Text('Respuestas reveladas'),
-        Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: categories.length,
-            onPageChanged: (index) {
-              setState(() => _categoryIndex = index);
-              _revealController.forward(from: 0);
-            },
-            itemBuilder: (_, index) => _CategoryShowcase(
-              category: categories[index],
-              answersByPlayer: _answersByPlayer,
-              playerName: _playerName,
-              reveal: _revealController,
-              onChallenge: (playerId, word) => widget.controller.challengeWord(
-                playerId: playerId,
-                word: word,
+          const Text('Respuestas reveladas'),
+          Expanded(
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: categories.length,
+              onPageChanged: (index) {
+                setState(() => _categoryIndex = index);
+                _revealController.forward(from: 0);
+              },
+              itemBuilder: (_, index) => _CategoryShowcase(
+                category: categories[index],
+                answersByPlayer: _answersByPlayer,
+                playerName: _playerName,
+                reveal: _revealController,
+                onChallenge: (playerId, word) =>
+                    widget.controller.challengeWord(
+                  playerId: playerId,
+                  category: categories[index],
+                  word: word,
+                ),
               ),
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 24),
-          child: Text(
-              '${_categoryIndex + 1} / ${categories.length} · Desliza para continuar'),
-        ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Text(
+                '${_categoryIndex + 1} / ${categories.length} · Desliza para continuar'),
+          ),
+        ]),
+        if (widget.controller.activeChallenge case final challenge?)
+          ChallengeModal(controller: widget.controller, challenge: challenge),
       ]),
     );
   }

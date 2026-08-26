@@ -10,6 +10,10 @@ enum GameEvent {
   submitAnswers,
   invalidateCurrentCategory,
   challengeWord,
+  challengeChecking,
+  juryVoteStarted,
+  juryVote,
+  challengeResolved,
   error,
 }
 
@@ -24,6 +28,10 @@ extension GameEventWireFormat on GameEvent {
         GameEvent.submitAnswers => 'SUBMIT_ANSWERS',
         GameEvent.invalidateCurrentCategory => 'INVALIDATE_CURRENT_CATEGORY',
         GameEvent.challengeWord => 'CHALLENGE_WORD',
+        GameEvent.challengeChecking => 'CHALLENGE_CHECKING',
+        GameEvent.juryVoteStarted => 'JURY_VOTE_STARTED',
+        GameEvent.juryVote => 'JURY_VOTE',
+        GameEvent.challengeResolved => 'CHALLENGE_RESOLVED',
         GameEvent.error => 'ERROR',
       };
 

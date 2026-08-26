@@ -5,6 +5,7 @@ class RoundData {
     required this.stopperPlayerId,
     this.answersByPlayer = const {},
     this.invalidCategoriesByPlayer = const {},
+    this.validCategoriesByPlayer = const {},
   });
 
   final int number;
@@ -13,10 +14,14 @@ class RoundData {
   final Map<String, Map<String, String>> answersByPlayer;
   final Map<String, Set<String>> invalidCategoriesByPlayer;
 
+  /// Casillas confirmadas por el Tribunal; cada una vale 100 puntos.
+  final Map<String, Set<String>> validCategoriesByPlayer;
+
   RoundData copyWith({
     String? letter,
     Map<String, Map<String, String>>? answersByPlayer,
     Map<String, Set<String>>? invalidCategoriesByPlayer,
+    Map<String, Set<String>>? validCategoriesByPlayer,
   }) =>
       RoundData(
         number: number,
@@ -25,6 +30,8 @@ class RoundData {
         answersByPlayer: answersByPlayer ?? this.answersByPlayer,
         invalidCategoriesByPlayer:
             invalidCategoriesByPlayer ?? this.invalidCategoriesByPlayer,
+        validCategoriesByPlayer:
+            validCategoriesByPlayer ?? this.validCategoriesByPlayer,
       );
 
   Map<String, dynamic> toJson() => {
@@ -33,6 +40,9 @@ class RoundData {
         'stopperPlayerId': stopperPlayerId,
         'answersByPlayer': answersByPlayer,
         'invalidCategoriesByPlayer': invalidCategoriesByPlayer.map(
+          (playerId, categories) => MapEntry(playerId, categories.toList()),
+        ),
+        'validCategoriesByPlayer': validCategoriesByPlayer.map(
           (playerId, categories) => MapEntry(playerId, categories.toList()),
         ),
       };
@@ -52,6 +62,11 @@ class RoundData {
         ),
         invalidCategoriesByPlayer:
             (json['invalidCategoriesByPlayer'] as Map? ?? {}).map(
+          (key, value) =>
+              MapEntry(key as String, Set<String>.from(value as List)),
+        ),
+        validCategoriesByPlayer:
+            (json['validCategoriesByPlayer'] as Map? ?? {}).map(
           (key, value) =>
               MapEntry(key as String, Set<String>.from(value as List)),
         ),

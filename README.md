@@ -22,11 +22,15 @@ Todos los mensajes tienen esta forma:
 {"event":"LETTER_STOPPED","payload":{"letter":"M"}}
 ```
 
-Eventos de dominio: `LOBBY_STATE`, `START_LETTER_SPIN`, `LETTER_STOPPED`, `TRIGGER_BASTA`, `FREEZE_INPUTS`, `INVALIDATE_CURRENT_CATEGORY`.
+Eventos de dominio: `LOBBY_STATE`, `START_LETTER_SPIN`, `LETTER_STOPPED`, `TRIGGER_BASTA`, `FREEZE_INPUTS`, `INVALIDATE_CURRENT_CATEGORY`, `CHALLENGE_CHECKING`, `JURY_VOTE_STARTED`, `JURY_VOTE` y `CHALLENGE_RESOLVED`.
 
 Los enums internos usan lowerCamelCase, pero la capa de protocolo los serializa con estos literales exactos en mayúsculas.
 
 Los auxiliares `joinLobby` y `submitAnswers` permiten la entrada y entrega de datos. `TRIGGER_BASTA` inicia un contador local de 10 s y sólo el Host emite `FREEZE_INPUTS` al finalizar, por lo que conserva la autoridad del estado.
+
+## Tribunal de Palabras
+
+El Host consulta primero `assets/dictionary_es.json` (más un vocabulario mínimo en código) y sólo si no encuentra la palabra consulta Free Dictionary con un límite de 3 segundos. Una respuesta confirmada queda marcada en `RoundData.validCategoriesByPlayer` y vale 100 puntos. Si no hay confirmación, el Host abre un jurado sincronizado de 5 segundos; cada cliente puede emitir un único `JURY_VOTE` y el Host resuelve por mayoría simple. Los empates y la ausencia de votos rechazan la palabra.
 
 ## Ciclo de vida
 
