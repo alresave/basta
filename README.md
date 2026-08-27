@@ -1,8 +1,6 @@
 # Basta P2P
 
-Base Flutter para un juego Basta / Tutti Frutti sin backend: un teléfono es Host WebSocket en la Wi-Fi y publica su sala con mDNS/DNS-SD (`_basta._tcp`). Los clientes descubren esa sala y se conectan directamente a la IP/puerto local.
-
-Actualmente el modo LAN está implementado. La sección **Ruta a multijugador por Internet** describe el trabajo necesario para que los jugadores puedan invitarse y jugar desde redes distintas.
+Juego Flutter de Basta / Tutti Frutti con dos modos: LAN P2P mediante WebSocket y mDNS/DNS-SD (`_basta._tcp`), y salas remotas mediante Supabase Realtime. En ambos, el Host lógico conserva la autoridad sobre letras, temporizadores, impugnaciones y puntos.
 
 ## Diseño
 
@@ -11,6 +9,7 @@ presentation/            UI y bindings de Flutter
 application/             GameController: reglas y máquina de estados
 domain/models/            Player, GameState, RoundData (sin dependencias de red)
 data/network/             WebSocket local + anuncio/escaneo Zeroconf
+data/remote/              Salas Supabase y transporte Realtime privado
 data/protocol/            Envoltorio JSON tipado de eventos
 ```
 
@@ -38,43 +37,42 @@ El Host consulta primero `assets/dictionary_es.json` (más un vocabulario mínim
 
 La UI registra `GameController` como `WidgetsBindingObserver`. Si la aplicación de un jugador deja `resumed` mientras edita una categoría, emite `INVALIDATE_CURRENT_CATEGORY`; el Host la guarda en `RoundData` para que el puntaje ignore esa casilla.
 
-## Ruta a multijugador por Internet
+## Configuración de partida
 
-El descubrimiento mDNS y `SocketService` actual sólo funcionan dentro de la misma red Wi‑Fi. Para partidas móviles remotas se necesita un servicio en Internet; Google Play Games y Game Center pueden ser complementos sociales, pero no sustituyen una red unificada Android+iOS.
+Las categorías iniciales son **Nombre**, **Flor o fruto**, **Animal**, **Ciudad o país** y **Cosa**. En el lobby, el Host puede añadir o eliminar categorías antes de iniciar. La letra vigente se muestra de forma destacada en la pantalla de ronda.
 
-### Arquitectura objetivo
+## Multijugador por Internet (Supabase)
 
-```text
-App Android / iOS
-  └─ enlace o código de sala
-       └─ API de salas + autenticación opcional
-            ├─ base de datos: sala, jugadores, GameRegistry y reconexiones
-            └─ canal en tiempo real: WebSocket / Realtime
-                 └─ Host lógico autoritativo o servidor autoritativo
+El modo LAN sigue disponible sin backend. Para jugar desde redes distintas se implementó un adaptador de salas remotas sobre Supabase: inicio de sesión anónimo, creación/unión por código corto, tablas `rooms`, `room_players` y `room_events`, y broadcast privado de Realtime con políticas RLS.
+
+### Preparación local
+
+1. Aplica las migraciones en `supabase/migrations/` al proyecto Supabase enlazado.
+2. Activa **Anonymous Sign-Ins** en Supabase Authentication.
+3. Copia `.env.example` a `.env` y completa `SUPABASE_URL` y `SUPABASE_ANON_KEY` localmente. Nunca versionar `.env`.
+4. Ejecuta el modo remoto con:
+
+```bash
+sh tool/run_remote.sh
 ```
 
-Se puede usar Supabase (Postgres + Realtime + Edge Functions) o Firebase como backend. La primera versión debe conservar el `GameController` y los eventos de dominio; sólo cambia el adaptador de transporte local por un `RemoteGameTransport` autenticado.
+El script pasa las credenciales mediante `--dart-define`; no se guardan dentro de la app ni en el repositorio.
 
 ### Flujo de una partida remota
 
-1. El creador inicia sesión de forma anónima o con una cuenta y crea una sala.
-2. El backend genera un código corto y un enlace, por ejemplo `https://basta.app/sala/ABCD12`.
-3. El creador comparte el enlace mediante el selector nativo del sistema; el receptor abre la app o la instala y entra en la sala.
-4. Cada dispositivo se suscribe al canal de la sala. El backend valida que el jugador pertenece a ella y reenvía los eventos del juego.
-5. El Host lógico mantiene la autoridad sobre letra, temporizadores, impugnaciones y puntos. Para mayor resistencia, esa autoridad puede migrarse a una función de servidor.
-6. Si un cliente se desconecta, guarda su identidad y último estado confirmado; al volver, se vuelve a suscribir y recibe un `LOBBY_STATE` completo con el `GameRegistry` acumulado.
-7. Al terminar, el backend persiste el resumen y permite consultar o compartir el marcador.
+1. El creador inicia sesión anónima y crea una sala; recibe un código corto.
+2. Cada invitado introduce ese código y se une a la sala.
+3. Los miembros se suscriben al canal Realtime privado de la sala.
+4. El Host recibe las acciones, actualiza el estado autoritativo y emite el estado sincronizado a los jugadores.
 
-### Implementación por etapas
+### Pendiente de la versión remota
 
-- [ ] Crear el proyecto backend, tablas/colecciones para `rooms`, `room_players` y snapshots de `GameRegistry`.
-- [ ] Añadir identidad anónima persistente y control de acceso por miembro de sala.
-- [ ] Implementar API para crear, unirse, abandonar y cerrar salas; generar código corto y deep link.
-- [ ] Crear `RemoteGameTransport` sobre WebSocket/Supabase Realtime y conservar `SocketService` para modo LAN.
-- [ ] Validar en servidor los mensajes críticos (`STOP_LETTER`, votos, puntajes y cambios de fase) y limitar spam/reintentos.
-- [ ] Añadir reanudación de sesión y presencia: timeout, reconexión, reenvío del estado completo y abandono definitivo.
+- [ ] Realizar una prueba completa en dos dispositivos y redes distintas: crear/unirse, rondas, jurado, puntos y marcador final.
+- [ ] Añadir compartir código/enlace y deep links: Android App Links e iOS Universal Links.
+- [ ] Implementar presencia, reconexión remota y abandono de salas con reenvío del último estado completo.
+- [ ] Mover validaciones críticas y límites anti-spam al servidor/Edge Functions.
+- [ ] Persistir el resumen final de la partida en Supabase y permitir compartirlo.
 - [ ] Probar Android↔iOS por Wi‑Fi, datos móviles y redes NAT restrictivas.
-- [ ] Configurar deep links/App Links (Android) y Universal Links (iOS), además de una landing de descarga.
 
 > WebRTC sólo es recomendable si se necesita P2P directo. Requiere señalización y, en la práctica, un servidor TURN para redes que bloquean conexiones entrantes. Un canal WebSocket administrado es más simple y fiable para Basta.
 
@@ -86,3 +84,16 @@ flutter run
 ```
 
 En Android se requieren permisos de Internet y red Wi‑Fi local. En iOS, el proyecto debe declarar la descripción de red local y Bonjour para `_basta._tcp` en `Info.plist` mientras exista el modo LAN. El modo remoto requiere HTTPS/WSS, deep links y las políticas de privacidad de la plataforma.
+
+## Android: firma y distribución
+
+El release local se firma con un keystore local referenciado por `android/key.properties`; ambos están ignorados por Git. Usa `android/key.properties.example` como plantilla y conserva el keystore y sus contraseñas en un gestor de secretos.
+
+El workflow de GitHub Pages genera el APK firmado desde estos secretos de GitHub Actions:
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_STORE_PASSWORD`
+- `ANDROID_KEY_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+
+El keystore se recrea sólo durante la ejecución de CI y se publica el APK resultante en la página de descarga. Antes de publicar en Play Store aún falta definir el `applicationId` definitivo, versionado de releases, ficha de Play y pruebas en dispositivos reales.
