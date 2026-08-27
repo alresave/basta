@@ -15,6 +15,13 @@ class GameConfig {
   final int totalRounds;
   final int bastaSeconds;
 
+  GameConfig copyWith({List<String>? categories, int? totalRounds}) =>
+      GameConfig(
+        categories: categories ?? this.categories,
+        totalRounds: totalRounds ?? this.totalRounds,
+        bastaSeconds: bastaSeconds,
+      );
+
   Map<String, dynamic> toJson() => {
         'categories': categories,
         'totalRounds': totalRounds,
@@ -51,6 +58,7 @@ class GameState {
 
   GameState copyWith({
     List<Player>? players,
+    GameConfig? config,
     GamePhase? phase,
     RoundData? currentRound,
     int? secondsRemaining,
@@ -60,7 +68,7 @@ class GameState {
         roomId: roomId,
         hostId: hostId,
         players: players ?? this.players,
-        config: config,
+        config: config ?? this.config,
         phase: phase ?? this.phase,
         currentRound: currentRound ?? this.currentRound,
         secondsRemaining: secondsRemaining ?? this.secondsRemaining,

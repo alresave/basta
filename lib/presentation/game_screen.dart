@@ -73,6 +73,9 @@ class _GameScreenState extends State<GameScreen> {
             localAnswers: _answers,
           );
         }
+        if (state.phase == GamePhase.lobby) {
+          return _LobbySetup(controller: widget.controller, state: state);
+        }
         return Scaffold(
           appBar: AppBar(
             title: Text('Ronda ${state.currentRound?.number ?? '-'}'),
@@ -188,19 +191,131 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
+class _LobbySetup extends StatefulWidget {
+  const _LobbySetup({required this.controller, required this.state});
+  final GameController controller;
+  final GameState state;
+
+  @override
+  State<_LobbySetup> createState() => _LobbySetupState();
+}
+
+class _LobbySetupState extends State<_LobbySetup> {
+  final _category = TextEditingController();
+
+  @override
+  void dispose() {
+    _category.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Sala · Configuración')),
+        floatingActionButton: widget.controller.isHost
+            ? FloatingActionButton.extended(
+                onPressed: widget.controller.startRound,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Iniciar ronda'),
+              )
+            : null,
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Text('Categorías',
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 6),
+            Text(widget.controller.isHost
+                ? 'Como admin puedes agregar o quitar categorías antes de empezar.'
+                : 'Esperando a que el admin configure la partida.'),
+            const SizedBox(height: 16),
+            ...widget.state.config.categories.map((category) => Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.category_outlined),
+                    title: Text(category),
+                    trailing: widget.controller.isHost
+                        ? IconButton(
+                            tooltip: 'Quitar categoría',
+                            icon: const Icon(Icons.close_rounded),
+                            onPressed: () =>
+                                widget.controller.removeCategory(category),
+                          )
+                        : null,
+                  ),
+                )),
+            if (widget.controller.isHost) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _category,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      labelText: 'Nueva categoría',
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: _addCategory,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IconButton.filled(
+                  tooltip: 'Agregar categoría',
+                  onPressed: () => _addCategory(_category.text),
+                  icon: const Icon(Icons.add_rounded),
+                ),
+              ]),
+            ],
+          ],
+        ),
+      );
+
+  void _addCategory(String value) {
+    widget.controller.addCategory(value);
+    _category.clear();
+  }
+}
+
 class _RoundHeader extends StatelessWidget {
   const _RoundHeader({required this.state});
   final GameState state;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
         child: Column(children: [
-          Text('Letra', style: Theme.of(context).textTheme.labelLarge),
-          Text(
-            state.currentRound?.letter ?? '…',
-            style: Theme.of(context).textTheme.displayMedium,
+          Text('LETRA DE LA RONDA',
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(letterSpacing: 1.5)),
+          const SizedBox(height: 8),
+          Container(
+            width: 142,
+            height: 142,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD92F), Color(0xFFFF9D20)]),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x55000000),
+                    blurRadius: 16,
+                    offset: Offset(0, 7))
+              ],
+              border: Border.all(color: Colors.white, width: 5),
+            ),
+            child: Text(
+              state.currentRound?.letter ?? '…',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                    fontSize: 92,
+                    height: .95,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF13255D),
+                  ),
+            ),
           ),
+          const SizedBox(height: 10),
           if (state.phase == GamePhase.spinning)
             const Text('Esperando a que se detenga el abecedario…'),
         ]),

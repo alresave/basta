@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 import '../data/network/local_discovery_service.dart';
 import '../data/protocol/game_message.dart';
 import '../data/network/socket_service.dart';
+import '../data/remote/remote_game_transport.dart';
+import '../data/remote/remote_room_service.dart';
 import '../data/storage/game_registry_storage.dart';
 import '../data/validation/word_validation_service.dart';
 import '../domain/models/game_state.dart';
@@ -15,6 +17,7 @@ import '../domain/models/round_data.dart';
 import '../domain/models/word_challenge.dart';
 import 'score_calculator_service.dart';
 import 'feedback_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GameController extends ChangeNotifier with WidgetsBindingObserver {
   GameController(
@@ -25,6 +28,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   final Player _me;
   final _socket = SocketService();
+  RemoteGameTransport? _remoteTransport;
   final _discovery = LocalDiscoveryService();
   final _alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('');
   final WordValidationService _wordValidationService;
@@ -77,9 +81,43 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     _hostPort = room.port;
     _listen();
     _listenConnection();
-    _socket.sendToHost(
+    _sendToHost(
       GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()),
     );
+  }
+
+  Future<String> hostRemote(GameConfig config) async {
+    _isHost = true;
+    final room = await RemoteRoomService(Supabase.instance.client).createRoom();
+    _remoteTransport = RemoteGameTransport(
+      client: Supabase.instance.client,
+      roomId: room.id,
+      isHost: true,
+    );
+    await _remoteTransport!.start();
+    state = GameState(
+      roomId: room.code,
+      hostId: _me.id,
+      players: [_me.copyWith()],
+      config: config,
+    );
+    _listen();
+    _publishState();
+    notifyListeners();
+    return room.code;
+  }
+
+  Future<void> joinRemote(String code) async {
+    final room =
+        await RemoteRoomService(Supabase.instance.client).joinRoom(code);
+    _remoteTransport = RemoteGameTransport(
+      client: Supabase.instance.client,
+      roomId: room.id,
+      isHost: false,
+    );
+    await _remoteTransport!.start();
+    _listen();
+    _sendToHost(GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()));
   }
 
   void startRound() {
@@ -106,7 +144,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   void stopLetter() {
     if (!_isHost) {
-      _socket.sendToHost(GameMessage(
+      _sendToHost(GameMessage(
         event: GameEvent.stopLetter,
         payload: {'playerId': _me.id},
       ));
@@ -139,7 +177,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   void triggerBasta() {
     _feedback.bastaPressed();
     if (!_isHost) {
-      _socket.sendToHost(
+      _sendToHost(
         GameMessage(
             event: GameEvent.triggerBasta, payload: {'playerId': _me.id}),
       );
@@ -156,11 +194,43 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   void setActiveCategory(String? category) => _activeCategory = category;
 
+  void addCategory(String category) {
+    _assertHost();
+    final value = category.trim();
+    if (value.isEmpty ||
+        state!.phase != GamePhase.lobby ||
+        state!.config.categories
+            .any((item) => item.toLowerCase() == value.toLowerCase())) {
+      return;
+    }
+    state = state!.copyWith(
+      config: state!.config.copyWith(
+        categories: [...state!.config.categories, value],
+      ),
+    );
+    _publishState();
+  }
+
+  void removeCategory(String category) {
+    _assertHost();
+    if (state!.phase != GamePhase.lobby ||
+        state!.config.categories.length <= 1) {
+      return;
+    }
+    state = state!.copyWith(
+      config: state!.config.copyWith(
+        categories:
+            state!.config.categories.where((item) => item != category).toList(),
+      ),
+    );
+    _publishState();
+  }
+
   void submitAnswers(Map<String, String> answers) {
     if (_isHost) {
       _storeAnswers(_me.id, answers);
     } else {
-      _socket.sendToHost(
+      _sendToHost(
         GameMessage(
           event: GameEvent.submitAnswers,
           payload: {'playerId': _me.id, 'answers': answers},
@@ -182,11 +252,20 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     if (_isHost) {
       _handleHostMessage(message);
     } else {
-      _socket.sendToHost(message);
+      _sendToHost(message);
     }
   }
 
-  void _listen() => _messages ??= _socket.messages.listen(_handleMessage);
+  void _listen() => _messages ??=
+      (_remoteTransport?.messages ?? _socket.messages).listen(_handleMessage);
+
+  void _sendToHost(GameMessage message) {
+    if (_remoteTransport != null) {
+      _remoteTransport!.sendToHost(message);
+    } else {
+      _socket.sendToHost(message);
+    }
+  }
 
   void _listenConnection() =>
       _connection ??= _socket.connection.listen((connection) {
@@ -207,7 +286,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     if (_isHost || _hostAddress == null || _hostPort == null) return;
     try {
       await _socket.reconnect(_hostAddress!, _hostPort!);
-      _socket.sendToHost(
+      _sendToHost(
           GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()));
     } catch (_) {
       networkAlert = 'No fue posible reconectar. Revisa la misma red Wi‑Fi.';
@@ -363,7 +442,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     if (_isHost) {
       _recordJuryVote(challenge.id, _me.id, valid);
     } else {
-      _socket.sendToHost(message);
+      _sendToHost(message);
     }
   }
 
@@ -508,7 +587,12 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   void _publishState() =>
       _broadcast(GameEvent.lobbyState, {'state': state!.toJson()});
   void _broadcast(GameEvent event, Map<String, dynamic> payload) {
-    _socket.broadcast(GameMessage(event: event, payload: payload));
+    final message = GameMessage(event: event, payload: payload);
+    if (_remoteTransport != null) {
+      _remoteTransport!.broadcast(message);
+    } else {
+      _socket.broadcast(message);
+    }
     notifyListeners();
   }
 
@@ -528,7 +612,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       if (_isHost) {
         _invalidate(_me.id, _activeCategory!);
       } else {
-        _socket.sendToHost(message);
+        _sendToHost(message);
       }
       _activeCategory = null;
     }
@@ -540,6 +624,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     _countdown?.cancel();
     _messages?.cancel();
     _connection?.cancel();
+    _remoteTransport?.dispose();
     _socket.dispose();
     _discovery.dispose();
     super.dispose();
