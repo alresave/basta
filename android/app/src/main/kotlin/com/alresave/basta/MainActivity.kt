@@ -1,4 +1,4 @@
-package com.example.basta_local
+package com.alresave.basta
 
 import io.flutter.embedding.android.FlutterActivity
 
