@@ -31,5 +31,6 @@ windows/flutter/ephemeral/
 *.keystore
 key.properties
 android/key.properties
+android/keystore/
 ios/Runner/GoogleService-Info.plist
 android/app/google-services.json
