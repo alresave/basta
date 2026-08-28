@@ -222,6 +222,31 @@ class _LobbySetupState extends State<_LobbySetup> {
         body: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            Text('Código de sala: ${widget.state.roomId.toUpperCase()}',
+                style: Theme.of(context).textTheme.titleMedium),
+            if (widget.controller.localHostPort case final port?)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Conexión manual: IP de este teléfono · puerto $port',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            const SizedBox(height: 16),
+            Text('Jugadores (${widget.state.players.length})',
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 6),
+            ...widget.state.players.map((player) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    child: Text(player.nickname.substring(0, 1).toUpperCase()),
+                  ),
+                  title: Text(player.nickname),
+                  trailing: player.id == widget.state.hostId
+                      ? const Chip(label: Text('Host'))
+                      : null,
+                )),
+            const Divider(height: 32),
             Text('Categorías',
                 style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 6),

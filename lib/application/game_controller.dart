@@ -55,6 +55,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       state?.phase == GamePhase.bastaCountdown;
   String get playerId => _me.id;
   bool get isHost => _isHost;
+  int? get localHostPort => _isHost ? _socket.port : null;
 
   Future<void> host(GameConfig config) async {
     _isHost = true;
@@ -76,9 +77,18 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       _discovery.discover(onRoom);
 
   Future<void> join(LocalRoom room) async {
-    await _socket.connect(room.host, room.port);
-    _hostAddress = room.host;
-    _hostPort = room.port;
+    await joinAddress(room.host, room.port);
+  }
+
+  /// Respaldo para redes donde mDNS no atraviesa el emulador o el router.
+  Future<void> joinAddress(String host, int port) async {
+    final address = host.trim();
+    if (address.isEmpty || port < 1 || port > 65535) {
+      throw ArgumentError('Dirección o puerto inválidos.');
+    }
+    await _socket.connect(address, port);
+    _hostAddress = address;
+    _hostPort = port;
     _listen();
     _listenConnection();
     _sendToHost(
@@ -247,7 +257,12 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }) {
     final message = GameMessage(
       event: GameEvent.challengeWord,
-      payload: {'playerId': playerId, 'category': category, 'word': word},
+      payload: {
+        'actorId': _me.id,
+        'playerId': playerId,
+        'category': category,
+        'word': word,
+      },
     );
     if (_isHost) {
       _handleHostMessage(message);
@@ -300,37 +315,74 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _handleHostMessage(GameMessage message) {
+    if (state == null) return;
     switch (message.event) {
       case GameEvent.joinLobby:
-        final player = Player.fromJson(message.payload);
+        final player = _playerFromPayload(message.payload);
+        if (player == null) return;
         if (!state!.players.any((p) => p.id == player.id)) {
           state = state!.copyWith(players: [...state!.players, player]);
           _publishState();
+        } else {
+          // A returning client receives the authoritative snapshot immediately.
+          _socket.sendToPlayer(
+            player.id,
+            GameMessage(
+              event: GameEvent.lobbyState,
+              payload: {'state': state!.toJson()},
+            ),
+          );
         }
       case GameEvent.submitAnswers:
+        if (!_isKnownPlayer(message.payload['playerId']) ||
+            !inputsEnabled ||
+            message.payload['answers'] is! Map) {
+          return;
+        }
         _storeAnswers(
           message.payload['playerId'] as String,
           Map<String, String>.from(message.payload['answers'] as Map),
         );
       case GameEvent.triggerBasta:
+        if (!_isKnownPlayer(message.payload['playerId']) ||
+            state!.phase != GamePhase.answering) {
+          return;
+        }
         _startBastaAsHost();
       case GameEvent.stopLetter:
-        if (message.payload['playerId'] ==
-            state!.currentRound?.stopperPlayerId) {
+        if (_isKnownPlayer(message.payload['playerId']) &&
+            message.payload['playerId'] ==
+                state!.currentRound?.stopperPlayerId) {
           _stopLetterAsHost();
         }
       case GameEvent.invalidateCurrentCategory:
+        if (!_isKnownPlayer(message.payload['playerId']) ||
+            message.payload['category'] is! String ||
+            !state!.config.categories.contains(message.payload['category'])) {
+          return;
+        }
         _invalidate(
           message.payload['playerId'] as String,
           message.payload['category'] as String,
         );
       case GameEvent.challengeWord:
+        if (!_isKnownPlayer(message.payload['actorId']) ||
+            !_isKnownPlayer(message.payload['playerId']) ||
+            message.payload['category'] is! String ||
+            message.payload['word'] is! String) {
+          return;
+        }
         _startChallenge(
           playerId: message.payload['playerId'] as String,
           category: message.payload['category'] as String,
           word: message.payload['word'] as String,
         );
       case GameEvent.juryVote:
+        if (!_isKnownPlayer(message.payload['playerId']) ||
+            message.payload['challengeId'] is! String ||
+            message.payload['valid'] is! bool) {
+          return;
+        }
         _recordJuryVote(
           message.payload['challengeId'] as String,
           message.payload['playerId'] as String,
@@ -340,6 +392,22 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         break;
     }
   }
+
+  Player? _playerFromPayload(Map<String, dynamic> payload) {
+    try {
+      final player = Player.fromJson(payload);
+      return player.id.trim().isEmpty || player.nickname.trim().isEmpty
+          ? null
+          : player;
+    } on TypeError {
+      return null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  bool _isKnownPlayer(Object? id) =>
+      id is String && state!.players.any((player) => player.id == id);
 
   void _handleClientMessage(GameMessage message) {
     switch (message.event) {
@@ -564,6 +632,9 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _storeAnswers(String playerId, Map<String, String> answers) {
+    if (state!.currentRound == null) return;
+    final permitted = state!.config.categories.toSet();
+    answers.removeWhere((category, _) => !permitted.contains(category));
     final old = state!.currentRound!;
     state = state!.copyWith(
       currentRound: old.copyWith(
@@ -574,6 +645,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void _invalidate(String playerId, String category) {
+    if (state!.currentRound == null) return;
     final old = state!.currentRound!;
     final invalid = Map<String, Set<String>>.from(
       old.invalidCategoriesByPlayer,

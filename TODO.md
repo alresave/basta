@@ -63,8 +63,8 @@ Fecha: 2026-08-26
 
 ## Pendiente
 
-- [ ] Añadir flujo visual de lobby: buscar salas, unirse, configurar categorías y comenzar partida.
-- [ ] Completar reconexión del Host y validación/autorización de mensajes de red (la alerta y reconexión de clientes ya están implementadas).
+- [x] Añadir flujo visual de lobby: buscar salas, unirse, configurar categorías y comenzar partida.
+- [x] Completar reconexión del Host y validación/autorización de mensajes de red (la alerta y reconexión de clientes ya están implementadas).
 - [ ] Configurar permisos de red local/Bonjour para iOS y realizar pruebas físicas de descubrimiento Android/iOS.
 - [ ] Añadir pruebas de integración para el flujo Host–Cliente y transición de rondas.
 - [ ] Configurar keystore de release, `applicationId` definitivo e íconos nativos antes de distribuir por Play Store.
