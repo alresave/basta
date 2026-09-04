@@ -1,6 +1,6 @@
 # Bitácora y pendientes — Basta P2P
 
-Fecha: 2026-08-26
+Fecha de última revisión: 2026-09-03
 
 ## Hecho hoy
 
@@ -61,11 +61,19 @@ Fecha: 2026-08-26
 - [x] Añadida landing de descarga y workflow de GitHub Pages que compila y publica el APK.
 - [x] Commit: `2dbfef8 feat: add Android release and download page`.
 
+### Parte 7 — Lobby, salvaguardas y preparación de release
+
+- [x] Añadido flujo visual de lobby: búsqueda de salas, unión, configuración de categorías e inicio de partida.
+- [x] Completadas la reconexión del cliente al Host y la validación/autorización de mensajes de red.
+- [x] Definido Android `applicationId`/namespace: `com.alresave.basta`.
+- [x] Añadida configuración de firma release y validación explícita de los secretos requeridos en GitHub Actions.
+- [x] Añadido workflow de compilación, firma y despliegue en GitHub Pages.
+- [x] Verificación local: `flutter analyze` sin incidencias y 6 pruebas unitarias aprobadas (2026-09-03).
+- [x] Commits: `bb79adb`, `b97e095`, `c3a17f2`.
+
 ## Pendiente
 
-- [x] Añadir flujo visual de lobby: buscar salas, unirse, configurar categorías y comenzar partida.
-- [x] Completar reconexión del Host y validación/autorización de mensajes de red (la alerta y reconexión de clientes ya están implementadas).
 - [ ] Configurar permisos de red local/Bonjour para iOS y realizar pruebas físicas de descubrimiento Android/iOS.
 - [ ] Añadir pruebas de integración para el flujo Host–Cliente y transición de rondas.
-- [ ] Configurar keystore de release, `applicationId` definitivo e íconos nativos antes de distribuir por Play Store.
-- [ ] Habilitar GitHub Pages con fuente **GitHub Actions** y confirmar la primera publicación del workflow.
+- [ ] Cargar en GitHub Actions los secretos de firma y confirmar la primera publicación de GitHub Pages, cuya fuente debe ser **GitHub Actions**.
+- [ ] Confirmar que `com.alresave.basta` está disponible y será el identificador definitivo de Play Store; preparar versionado, ficha y pruebas de release en dispositivos reales.

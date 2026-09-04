@@ -89,11 +89,11 @@ En Android se requieren permisos de Internet y red Wi‑Fi local. En iOS, el pro
 
 El release local se firma con un keystore local referenciado por `android/key.properties`; ambos están ignorados por Git. Usa `android/key.properties.example` como plantilla y conserva el keystore y sus contraseñas en un gestor de secretos.
 
-El workflow de GitHub Pages genera el APK firmado desde estos secretos de GitHub Actions:
+El workflow de GitHub Pages (`.github/workflows/pages.yml`) genera el APK firmado desde estos secretos de GitHub Actions:
 
 - `ANDROID_KEYSTORE_BASE64`
 - `ANDROID_STORE_PASSWORD`
 - `ANDROID_KEY_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 
-El keystore se recrea sólo durante la ejecución de CI y se publica el APK resultante en la página de descarga. Antes de publicar en Play Store aún falta definir el `applicationId` definitivo, versionado de releases, ficha de Play y pruebas en dispositivos reales.
+El keystore se recrea sólo durante la ejecución de CI y se publica el APK resultante en la página de descarga. El identificador configurado actualmente es `com.alresave.basta`; antes de publicar en Play Store hay que confirmar su disponibilidad y titularidad, configurar los secretos de CI, versionar los releases, completar la ficha de Play y hacer pruebas en dispositivos reales.
