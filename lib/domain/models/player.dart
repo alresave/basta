@@ -11,9 +11,9 @@ class Player {
   final bool isHost;
   final bool isConnected;
 
-  Player copyWith({bool? isConnected}) => Player(
+  Player copyWith({String? nickname, bool? isConnected}) => Player(
         id: id,
-        nickname: nickname,
+        nickname: nickname ?? this.nickname,
         isHost: isHost,
         isConnected: isConnected ?? this.isConnected,
       );

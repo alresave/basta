@@ -26,7 +26,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         _wordValidationService =
             wordValidationService ?? WordValidationService();
 
-  final Player _me;
+  Player _me;
   final _socket = SocketService();
   RemoteGameTransport? _remoteTransport;
   final _discovery = LocalDiscoveryService();
@@ -55,7 +55,17 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       state?.phase == GamePhase.bastaCountdown;
   String get playerId => _me.id;
   bool get isHost => _isHost;
+  bool get isRemoteRoom => _remoteTransport != null;
   int? get localHostPort => _isHost ? _socket.port : null;
+
+  /// El nombre queda fijado antes de entrar a una sala para que su identidad
+  /// sea coherente en todos los mensajes de la partida.
+  bool setNickname(String nickname) {
+    final value = nickname.trim();
+    if (state != null || value.isEmpty || value.length > 24) return false;
+    _me = _me.copyWith(nickname: value);
+    return true;
+  }
 
   Future<void> host(GameConfig config) async {
     _isHost = true;

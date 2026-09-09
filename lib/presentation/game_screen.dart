@@ -224,6 +224,24 @@ class _LobbySetupState extends State<_LobbySetup> {
           children: [
             Text('Código de sala: ${widget.state.roomId.toUpperCase()}',
                 style: Theme.of(context).textTheme.titleMedium),
+            if (widget.controller.isRemoteRoom)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(
+                        ClipboardData(text: widget.state.roomId.toUpperCase()));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Código copiado al portapapeles')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.content_copy_rounded),
+                  label: const Text('Copiar código para invitar'),
+                ),
+              ),
             if (widget.controller.localHostPort case final port?)
               Padding(
                 padding: const EdgeInsets.only(top: 4),

@@ -16,12 +16,17 @@ class GamePage extends StatefulWidget {
 
 class _GamePageState extends State<GamePage> {
   late final GameController controller;
+  final _nickname = TextEditingController(text: 'Jugador');
   final _remoteCode = TextEditingController();
   final _localHost = TextEditingController();
   final _localPort = TextEditingController();
   final Map<String, LocalRoom> _localRooms = {};
   bool _searchingRooms = false;
+  bool _creatingRemote = false;
+  bool _joiningRemote = false;
   String? _localError;
+  String? _nicknameError;
+  String? _remoteError;
 
   static const _defaultConfig = GameConfig(
     categories: ['Nombre', 'Flor o fruto', 'Animal', 'Ciudad o país', 'Cosa'],
@@ -37,6 +42,7 @@ class _GamePageState extends State<GamePage> {
 
   @override
   void dispose() {
+    _nickname.dispose();
     _remoteCode.dispose();
     _localHost.dispose();
     _localPort.dispose();
@@ -72,8 +78,27 @@ class _GamePageState extends State<GamePage> {
             Text('Jugar en la misma red Wi‑Fi',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
+            TextField(
+              controller: _nickname,
+              maxLength: 24,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Tu nombre',
+                hintText: 'Ej. Sofía',
+                border: const OutlineInputBorder(),
+                errorText: _nicknameError,
+              ),
+              onChanged: (_) {
+                if (_nicknameError != null) {
+                  setState(() => _nicknameError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 2),
             FilledButton.icon(
-              onPressed: () => controller.host(_defaultConfig),
+              onPressed: () {
+                if (_selectNickname()) controller.host(_defaultConfig);
+              },
               icon: const Icon(Icons.wifi_rounded),
               label: const Text('Crear sala local'),
             ),
@@ -157,16 +182,12 @@ class _GamePageState extends State<GamePage> {
                   style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 10),
               FilledButton.icon(
-                onPressed: () async {
-                  final code = await controller.hostRemote(_defaultConfig);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Sala remota creada: $code')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.public_rounded),
-                label: const Text('Crear sala remota'),
+                onPressed: _creatingRemote ? null : _createRemoteRoom,
+                icon: Icon(_creatingRemote
+                    ? Icons.sync_rounded
+                    : Icons.public_rounded),
+                label: Text(
+                    _creatingRemote ? 'Creando sala…' : 'Crear sala remota'),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -179,11 +200,19 @@ class _GamePageState extends State<GamePage> {
                   suffixIcon: IconButton(
                     tooltip: 'Unirse a sala remota',
                     icon: const Icon(Icons.login_rounded),
-                    onPressed: () => controller.joinRemote(_remoteCode.text),
+                    onPressed: _joiningRemote ? null : _joinRemoteRoom,
                   ),
                 ),
-                onSubmitted: controller.joinRemote,
+                onSubmitted: (_) {
+                  if (!_joiningRemote) _joinRemoteRoom();
+                },
               ),
+              if (_remoteError != null) ...[
+                const SizedBox(height: 8),
+                Text(_remoteError!,
+                    style:
+                        TextStyle(color: Theme.of(context).colorScheme.error)),
+              ],
             ],
           ]),
         ),
@@ -210,7 +239,50 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
+  Future<void> _createRemoteRoom() async {
+    if (!_selectNickname()) return;
+    setState(() {
+      _creatingRemote = true;
+      _remoteError = null;
+    });
+    try {
+      await controller.hostRemote(_defaultConfig);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _remoteError =
+            'No se pudo crear la sala. Revisa tu conexión e inténtalo otra vez.');
+      }
+    } finally {
+      if (mounted) setState(() => _creatingRemote = false);
+    }
+  }
+
+  Future<void> _joinRemoteRoom() async {
+    if (!_selectNickname()) return;
+    final code = _remoteCode.text.trim().toUpperCase();
+    if (!RegExp(r'^[A-Z2-9]{6}$').hasMatch(code)) {
+      setState(
+          () => _remoteError = 'Escribe un código válido de 6 caracteres.');
+      return;
+    }
+    setState(() {
+      _joiningRemote = true;
+      _remoteError = null;
+    });
+    try {
+      await controller.joinRemote(code);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _remoteError =
+            'No fue posible entrar. Confirma el código y que la sala siga abierta.');
+      }
+    } finally {
+      if (mounted) setState(() => _joiningRemote = false);
+    }
+  }
+
   Future<void> _joinLocalRoom(LocalRoom room) async {
+    if (!_selectNickname()) return;
     setState(() => _localError = null);
     try {
       await controller.join(room);
@@ -223,6 +295,7 @@ class _GamePageState extends State<GamePage> {
   }
 
   Future<void> _joinManualRoom() async {
+    if (!_selectNickname()) return;
     final port = int.tryParse(_localPort.text.trim());
     if (_localHost.text.trim().isEmpty || port == null) {
       setState(() => _localError = 'Indica la IP y el puerto de la sala.');
@@ -239,5 +312,20 @@ class _GamePageState extends State<GamePage> {
             'No fue posible entrar a la sala. Confirma IP, puerto y Wi‑Fi.');
       }
     }
+  }
+
+  bool _selectNickname() {
+    final value = _nickname.text.trim();
+    if (value.isEmpty) {
+      setState(() => _nicknameError = 'Escribe un nombre para jugar.');
+      return false;
+    }
+    if (!controller.setNickname(value)) {
+      setState(
+          () => _nicknameError = 'El nombre puede tener hasta 24 caracteres.');
+      return false;
+    }
+    setState(() => _nicknameError = null);
+    return true;
   }
 }
