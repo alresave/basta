@@ -335,13 +335,17 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
           _publishState();
         } else {
           // A returning client receives the authoritative snapshot immediately.
-          _socket.sendToPlayer(
-            player.id,
-            GameMessage(
-              event: GameEvent.lobbyState,
-              payload: {'state': state!.toJson()},
-            ),
+          final snapshot = GameMessage(
+            event: GameEvent.lobbyState,
+            payload: {'state': state!.toJson()},
           );
+          if (_remoteTransport != null) {
+            // Realtime no tiene un socket individual del jugador; publicar el
+            // snapshot es seguro porque el estado del Host es autoritativo.
+            _remoteTransport!.broadcast(snapshot);
+          } else {
+            _socket.sendToPlayer(player.id, snapshot);
+          }
         }
       case GameEvent.submitAnswers:
         if (!_isKnownPlayer(message.payload['playerId']) ||
@@ -704,6 +708,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _countdown?.cancel();
+    _juryTimer?.cancel();
     _messages?.cancel();
     _connection?.cancel();
     _remoteTransport?.dispose();

@@ -1,6 +1,6 @@
 # Bitácora y pendientes — Basta P2P
 
-Fecha de última revisión: 2026-09-03
+Fecha de última revisión: 2026-09-11
 
 ## Hecho hoy
 
@@ -73,7 +73,9 @@ Fecha de última revisión: 2026-09-03
 
 ## Pendiente
 
-- [ ] Configurar permisos de red local/Bonjour para iOS y realizar pruebas físicas de descubrimiento Android/iOS.
-- [ ] Añadir pruebas de integración para el flujo Host–Cliente y transición de rondas.
+- [x] Generada la plataforma iOS y declarados `NSLocalNetworkUsageDescription` y `_basta._tcp` en `NSBonjourServices`.
+- [x] Preparada la app macOS con identificador `com.alresave.basta` y permisos sandbox de red cliente/servidor.
+- [x] Añadidas pruebas automatizadas de protocolo/sincronización Host–Cliente: estado previo a la letra, respuestas, impugnaciones y letras jugadas.
+- [ ] Realizar pruebas físicas de descubrimiento Android/iOS y una partida completa en dos dispositivos.
 - [ ] Cargar en GitHub Actions los secretos de firma y confirmar la primera publicación de GitHub Pages, cuya fuente debe ser **GitHub Actions**.
 - [ ] Confirmar que `com.alresave.basta` está disponible y será el identificador definitivo de Play Store; preparar versionado, ficha y pruebas de release en dispositivos reales.
