@@ -12,6 +12,7 @@ import '../data/remote/remote_room_service.dart';
 import '../data/storage/game_registry_storage.dart';
 import '../data/validation/word_validation_service.dart';
 import '../domain/models/game_state.dart';
+import '../domain/models/game_registry.dart';
 import '../domain/models/player.dart';
 import '../domain/models/round_data.dart';
 import '../domain/models/word_challenge.dart';
@@ -57,6 +58,21 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   bool get isHost => _isHost;
   bool get isRemoteRoom => _remoteTransport != null;
   int? get localHostPort => _isHost ? _socket.port : null;
+
+  /// Muestra exactamente el mismo cálculo que se guardará al cerrar la ronda.
+  /// Así la revisión nunca promete puntos distintos a los del marcador.
+  RoundScore previewReviewScore() {
+    final currentState = state;
+    final round = currentState?.currentRound;
+    if (currentState == null || round == null) {
+      throw StateError('No hay una ronda para puntuar');
+    }
+    return _scoreCalculator.calculate(
+      round: round,
+      state: currentState,
+      resolvedChallenges: _roundChallenges,
+    );
+  }
 
   /// El nombre queda fijado antes de entrar a una sala para que su identidad
   /// sea coherente en todos los mensajes de la partida.

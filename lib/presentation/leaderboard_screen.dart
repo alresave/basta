@@ -13,11 +13,18 @@ class LeaderboardScreen extends StatelessWidget {
     final players = [...state.players]..sort((left, right) => state.registry
         .totalFor(right.id)
         .compareTo(state.registry.totalFor(left.id)));
+    final topScore =
+        players.isEmpty ? 0 : state.registry.totalFor(players.first.id);
+    final champions = players
+        .where((player) => state.registry.totalFor(player.id) == topScore)
+        .toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Fin del abecedario')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _ChampionCard(champions: champions, points: topScore),
+          const SizedBox(height: 24),
           Text('Posiciones finales',
               style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 12),
@@ -63,6 +70,37 @@ class LeaderboardScreen extends StatelessWidget {
         .where((player) => score(player.id) == highest)
         .map((player) => player.nickname)
         .join(' · ');
+  }
+}
+
+class _ChampionCard extends StatelessWidget {
+  const _ChampionCard({required this.champions, required this.points});
+  final List<Player> champions;
+  final int points;
+
+  @override
+  Widget build(BuildContext context) {
+    final names = champions.isEmpty
+        ? 'La partida terminó'
+        : champions.map((player) => player.nickname).join(' · ');
+    final tie = champions.length > 1;
+    return Card(
+      color: Colors.amber.shade100,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(children: [
+          const Text('🏆', style: TextStyle(fontSize: 46)),
+          Text(tie ? '¡Empate espectacular!' : '¡Campeón de Basta!',
+              style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 6),
+          Text(names,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge),
+          Text('$points puntos',
+              style: Theme.of(context).textTheme.titleMedium),
+        ]),
+      ),
+    );
   }
 }
 

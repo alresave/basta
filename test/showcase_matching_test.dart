@@ -23,19 +23,21 @@ void main() {
     expect(matches.single.pointsPerPlayer, 50);
   });
 
-  test('asigna puntaje por cantidad de jugadores coincidentes', () {
+  test(
+      'una coincidencia vale 50 puntos para cada jugador, sin importar el grupo',
+      () {
     expect(
       findRepeatedWords({'a': 'perro', 'b': 'perro', 'c': 'perro'})
           .single
           .pointsPerPlayer,
-      30,
+      50,
     );
     expect(
       findRepeatedWords(
               {'a': 'perro', 'b': 'perro', 'c': 'perro', 'd': 'perro'})
           .single
           .pointsPerPlayer,
-      25,
+      50,
     );
     expect(
       findRepeatedWords({
@@ -45,7 +47,7 @@ void main() {
         'd': 'perro',
         'e': 'perro',
       }).single.pointsPerPlayer,
-      20,
+      50,
     );
   });
 }

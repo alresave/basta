@@ -15,12 +15,7 @@ class WordMatch {
   final List<String> playerIds;
   final List<String> words;
 
-  int get pointsPerPlayer => switch (playerIds.length) {
-        2 => 50,
-        3 => 30,
-        4 => 25,
-        _ => 20,
-      };
+  int get pointsPerPlayer => 50;
 
   bool includes(String playerId) => playerIds.contains(playerId);
 }
@@ -54,7 +49,7 @@ int levenshteinDistance(String left, String right) {
   return previous.last;
 }
 
-/// Identifica iguales y variantes muy cercanas (hasta 20 % de diferencia).
+/// Identifica respuestas repetidas usando la misma normalización del puntaje.
 List<WordMatch> findRepeatedWords(Map<String, String> wordsByPlayer) {
   final entries = wordsByPlayer.entries
       .where((entry) => normalizeWord(entry.value).isNotEmpty)
@@ -76,12 +71,8 @@ List<WordMatch> findRepeatedWords(Map<String, String> wordsByPlayer) {
 
   for (var first = 0; first < entries.length; first++) {
     for (var second = first + 1; second < entries.length; second++) {
-      final a = normalizeWord(entries[first].value);
-      final b = normalizeWord(entries[second].value);
-      // Para palabras cortas sólo cuenta igualdad exacta; evita falsos
-      // positivos como "sol" y "sal". A partir de 5 letras tolera 20 %.
-      final maxDistance = (math.max(a.length, b.length) * .2).floor();
-      if (levenshteinDistance(a, b) <= maxDistance) {
+      if (normalizeWord(entries[first].value) ==
+          normalizeWord(entries[second].value)) {
         join(first, second);
       }
     }
@@ -153,6 +144,47 @@ class _ShowcaseScreenState extends State<ShowcaseScreen>
           .firstOrNull ??
       'Jugador';
 
+  Future<void> _showRoundResults() async {
+    final score = widget.controller.previewReviewScore();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.emoji_events_rounded,
+                color: Colors.amber.shade800, size: 42),
+            const SizedBox(height: 8),
+            Text('Puntos de la ronda',
+                style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 4),
+            const Text('Única: 100 · repetida: 50 · defensa: +20'),
+            const SizedBox(height: 16),
+            ...score.scores.map((item) => ListTile(
+                  leading:
+                      CircleAvatar(child: Text(_playerName(item.playerId)[0])),
+                  title: Text(_playerName(item.playerId)),
+                  subtitle: Text(
+                      '${item.uniqueWords} únicas · ${item.successfulDefences} defensas'),
+                  trailing: Text('+${item.points}',
+                      style: Theme.of(context).textTheme.titleLarge),
+                )),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () async {
+                Navigator.pop(context);
+                await widget.controller.finishReview();
+              },
+              icon: const Icon(Icons.arrow_forward_rounded),
+              label: const Text('Continuar'),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final categories = widget.state.config.categories;
@@ -195,11 +227,14 @@ class _ShowcaseScreenState extends State<ShowcaseScreen>
             padding: const EdgeInsets.only(bottom: 24),
             child: widget.controller.isHost
                 ? FilledButton.icon(
-                    onPressed: widget.controller.activeChallenge == null
-                        ? widget.controller.finishReview
+                    onPressed: widget.controller.activeChallenge == null &&
+                            _categoryIndex == categories.length - 1
+                        ? _showRoundResults
                         : null,
                     icon: const Icon(Icons.arrow_forward_rounded),
-                    label: const Text('Cerrar ronda'),
+                    label: Text(_categoryIndex == categories.length - 1
+                        ? 'Ver puntos de la ronda'
+                        : 'Revela todas las categorías'),
                   )
                 : Text(
                     '${_categoryIndex + 1} / ${categories.length} · Esperando al Host'),
