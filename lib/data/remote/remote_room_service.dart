@@ -31,6 +31,31 @@ class RemoteRoomService {
     return RemoteRoom.fromJson(Map<String, dynamic>.from(response as Map));
   }
 
+  /// Sólo el Host puede escribir este snapshot (la política RLS lo refuerza).
+  /// Permite que un jugador que vuelva a la sala recupere el último estado
+  /// autoritativo incluso si perdió un broadcast mientras estaba desconectado.
+  Future<void> saveSnapshot({
+    required String roomId,
+    required Map<String, dynamic> state,
+    required String status,
+  }) =>
+      _client.from('rooms').update({
+        'game_state': state,
+        'status': status,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', roomId);
+
+  Future<void> markActive(String roomId) async {
+    await ensureSignedIn();
+    await _client
+        .from('room_players')
+        .update({
+          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
+        })
+        .eq('room_id', roomId)
+        .eq('user_id', _client.auth.currentUser!.id);
+  }
+
   String _newCode() => List.generate(
         6,
         (_) => _alphabet[Random.secure().nextInt(_alphabet.length)],
@@ -39,15 +64,22 @@ class RemoteRoomService {
 
 class RemoteRoom {
   const RemoteRoom(
-      {required this.id, required this.code, required this.status});
+      {required this.id,
+      required this.code,
+      required this.status,
+      required this.gameState});
 
   final String id;
   final String code;
   final String status;
+  final Map<String, dynamic> gameState;
 
   factory RemoteRoom.fromJson(Map<String, dynamic> json) => RemoteRoom(
         id: json['id'] as String,
         code: json['code'] as String,
         status: json['status'] as String,
+        gameState: json['game_state'] is Map
+            ? Map<String, dynamic>.from(json['game_state'] as Map)
+            : const {},
       );
 }

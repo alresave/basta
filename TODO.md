@@ -1,6 +1,6 @@
 # Bitácora y pendientes — Basta P2P
 
-Fecha de última revisión: 2026-09-11
+Fecha de última revisión: 2026-09-26
 
 ## Hecho hoy
 
@@ -68,10 +68,21 @@ Fecha de última revisión: 2026-09-11
 - [x] Definido Android `applicationId`/namespace: `com.alresave.basta`.
 - [x] Añadida configuración de firma release y validación explícita de los secretos requeridos en GitHub Actions.
 - [x] Añadido workflow de compilación, firma y despliegue en GitHub Pages.
-- [x] Verificación local: `flutter analyze` sin incidencias y 6 pruebas unitarias aprobadas (2026-09-03).
+- [x] Verificación local: `flutter analyze` sin incidencias y 9 pruebas unitarias aprobadas (2026-09-26).
 - [x] Commits: `bb79adb`, `b97e095`, `c3a17f2`.
 
+### Parte 8 — Resiliencia de salas remotas
+
+- [x] Implementada Presence de Supabase Realtime para reflejar los jugadores remotos conectados.
+- [x] Añadida reconexión manual del canal remoto desde el aviso de red.
+- [x] Persistido el snapshot autoritativo del Host en `rooms.game_state` y restaurado al volver a unirse a la sala.
+- [x] Añadida marca de actividad por jugador mediante `room_players.last_seen_at`.
+- [x] Añadida la migración `202609260001_remote_recovery.sql` con las políticas RLS necesarias para snapshots y actividad.
+- [x] Verificación local posterior: `flutter analyze` sin incidencias y 9 pruebas unitarias aprobadas (2026-09-26).
+
 ## Pendiente
+
+### Validación y lanzamiento LAN
 
 - [x] Generada la plataforma iOS y declarados `NSLocalNetworkUsageDescription` y `_basta._tcp` en `NSBonjourServices`.
 - [x] Preparada la app macOS con identificador `com.alresave.basta` y permisos sandbox de red cliente/servidor.
@@ -79,3 +90,13 @@ Fecha de última revisión: 2026-09-11
 - [ ] Realizar pruebas físicas de descubrimiento Android/iOS y una partida completa en dos dispositivos.
 - [ ] Cargar en GitHub Actions los secretos de firma y confirmar la primera publicación de GitHub Pages, cuya fuente debe ser **GitHub Actions**.
 - [ ] Confirmar que `com.alresave.basta` está disponible y será el identificador definitivo de Play Store; preparar versionado, ficha y pruebas de release en dispositivos reales.
+
+### Versión remota (Supabase)
+
+- [ ] Realizar una prueba completa en dos dispositivos y redes distintas: crear/unirse, rondas, jurado, puntos y marcador final.
+- [ ] Añadir compartir código/enlace y deep links: Android App Links e iOS Universal Links.
+- [x] Implementadas Presence de Realtime, reconexión manual y persistencia/recuperación del último estado autoritativo de la sala (requiere aplicar la migración `202609260001_remote_recovery.sql`).
+- [ ] Implementar abandono explícito de salas y su limpieza para jugadores inactivos.
+- [ ] Mover validaciones críticas y límites anti-spam al servidor/Edge Functions.
+- [ ] Persistir el resumen final de la partida en Supabase y permitir compartirlo.
+- [ ] Probar Android↔iOS por Wi‑Fi, datos móviles y redes NAT restrictivas.

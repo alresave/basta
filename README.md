@@ -69,7 +69,8 @@ El script pasa las credenciales mediante `--dart-define`; no se guardan dentro d
 
 - [ ] Realizar una prueba completa en dos dispositivos y redes distintas: crear/unirse, rondas, jurado, puntos y marcador final.
 - [ ] Añadir compartir código/enlace y deep links: Android App Links e iOS Universal Links.
-- [ ] Implementar presencia, reconexión remota y abandono de salas con reenvío del último estado completo.
+- [x] Implementadas Presence de Realtime, reconexión manual y reenvío/recuperación del último estado autoritativo. Requiere aplicar la migración `202609260001_remote_recovery.sql`.
+- [ ] Implementar abandono explícito de salas y limpieza de jugadores inactivos.
 - [ ] Mover validaciones críticas y límites anti-spam al servidor/Edge Functions.
 - [ ] Persistir el resumen final de la partida en Supabase y permitir compartirlo.
 - [ ] Probar Android↔iOS por Wi‑Fi, datos móviles y redes NAT restrictivas.

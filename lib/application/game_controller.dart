@@ -38,6 +38,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   final _registryStorage = GameRegistryStorage();
   StreamSubscription<GameMessage>? _messages;
   StreamSubscription<SocketConnectionState>? _connection;
+  StreamSubscription<RemoteConnectionState>? _remoteConnection;
+  StreamSubscription<List<RemotePresence>>? _remotePresence;
   Timer? _countdown;
   Timer? _juryTimer;
   String? _activeCategory;
@@ -50,6 +52,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
   String? _hostAddress;
   int? _hostPort;
   String? networkAlert;
+  List<RemotePresence> onlineRemotePlayers = const [];
 
   bool get inputsEnabled =>
       state?.phase == GamePhase.answering ||
@@ -129,8 +132,11 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       client: Supabase.instance.client,
       roomId: room.id,
       isHost: true,
+      playerId: _me.id,
+      nickname: _me.nickname,
     );
     await _remoteTransport!.start();
+    await RemoteRoomService(Supabase.instance.client).markActive(room.id);
     state = GameState(
       roomId: room.code,
       hostId: _me.id,
@@ -138,6 +144,7 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       config: config,
     );
     _listen();
+    _listenRemoteConnection();
     _publishState();
     notifyListeners();
     return room.code;
@@ -150,9 +157,17 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       client: Supabase.instance.client,
       roomId: room.id,
       isHost: false,
+      playerId: _me.id,
+      nickname: _me.nickname,
     );
     await _remoteTransport!.start();
+    await RemoteRoomService(Supabase.instance.client).markActive(room.id);
+    if (room.gameState.isNotEmpty) {
+      state = GameState.fromJson(room.gameState);
+      notifyListeners();
+    }
     _listen();
+    _listenRemoteConnection();
     _sendToHost(GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()));
   }
 
@@ -323,7 +338,41 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
         notifyListeners();
       });
 
+  void _listenRemoteConnection() {
+    final transport = _remoteTransport;
+    if (transport == null || _remoteConnection != null) return;
+    _remoteConnection = transport.connection.listen((connection) {
+      switch (connection) {
+        case RemoteConnectionState.connected:
+          networkAlert = null;
+        case RemoteConnectionState.reconnecting:
+          networkAlert = 'Reconectando a la sala remota…';
+        case RemoteConnectionState.disconnected:
+          networkAlert = 'Se perdió la conexión con la sala remota.';
+      }
+      notifyListeners();
+    });
+    _remotePresence = transport.presence.listen((players) {
+      onlineRemotePlayers = players;
+      notifyListeners();
+    });
+  }
+
   Future<void> reconnect() async {
+    if (_remoteTransport != null) {
+      try {
+        await _remoteTransport!.reconnect();
+        await RemoteRoomService(Supabase.instance.client)
+            .markActive(_remoteTransport!.roomId);
+        _sendToHost(
+          GameMessage(event: GameEvent.joinLobby, payload: _me.toJson()),
+        );
+      } catch (_) {
+        networkAlert = 'No fue posible reconectar a la sala remota.';
+        notifyListeners();
+      }
+      return;
+    }
     if (_isHost || _hostAddress == null || _hostPort == null) return;
     try {
       await _socket.reconnect(_hostAddress!, _hostPort!);
@@ -686,8 +735,25 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     );
   }
 
-  void _publishState() =>
-      _broadcast(GameEvent.lobbyState, {'state': state!.toJson()});
+  void _publishState() {
+    final currentState = state;
+    if (currentState == null) return;
+    _broadcast(GameEvent.lobbyState, {'state': currentState.toJson()});
+    final remote = _remoteTransport;
+    if (remote != null && _isHost) {
+      unawaited(RemoteRoomService(Supabase.instance.client).saveSnapshot(
+        roomId: remote.roomId,
+        state: currentState.toJson(),
+        status: _remoteStatusFor(currentState.phase),
+      ));
+    }
+  }
+
+  String _remoteStatusFor(GamePhase phase) => switch (phase) {
+        GamePhase.lobby => 'lobby',
+        GamePhase.finished => 'finished',
+        _ => 'playing',
+      };
   void _broadcast(GameEvent event, Map<String, dynamic> payload) {
     final message = GameMessage(event: event, payload: payload);
     if (_remoteTransport != null) {
@@ -727,6 +793,8 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     _juryTimer?.cancel();
     _messages?.cancel();
     _connection?.cancel();
+    _remoteConnection?.cancel();
+    _remotePresence?.cancel();
     _remoteTransport?.dispose();
     _socket.dispose();
     _discovery.dispose();
